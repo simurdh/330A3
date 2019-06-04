@@ -6,14 +6,14 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
+import java.util.Map.Entry;
 
 class SimurdakAssignment3 {
 
 	static Connection conn = null;
 	static Connection write = null;
 
-	static ArrayList<Prices> dayPrices;
-	static CompanyData co_data;
+
 
 	public static void main(String[] args) throws Exception {
 		// Get connection properties
@@ -136,20 +136,19 @@ class SimurdakAssignment3 {
 //					System.out.println("numDays: " + numIntervals);
 				}
 				numIntervals = numIntervals/60;
-//				System.out.println("numIntervals = " + numIntervals);
+				System.out.println("numIntervals = " + numIntervals);
 				
 				// First Ticker
 				String firstTicker = null;
 				int i = 0;
-				
+				LinkedHashMap<Integer, String> IntervalStartDates = new LinkedHashMap<>();
+				LinkedHashMap<Integer, String> IntervalEndDates = new LinkedHashMap<>();
 				
 				
 				// For each Ticker
-				if (rs.getString(1).equals("Telecommunications Services")) {
+//				if (rs.getString(1).equals("Telecommunications Services")) {
 					while (rs2.next()) { 
-						LinkedHashMap<Integer, String> IntervalStartDates = new LinkedHashMap<>();
-						LinkedHashMap<Integer, String> IntervalEndDates = new LinkedHashMap<>();
-						
+
 						if (i == 0) {
 							firstTicker = rs2.getString(1);
 							// Store all start and end dates of the intervals for the first ticker
@@ -164,10 +163,12 @@ class SimurdakAssignment3 {
 							while (firstTickerRange.next()) {
 								// Get start date of interval
 								if (dayNum == 1 + ((j - 1)*60)) {
-//									System.out.println("DayNum: " + dayNum);
 									String intervalStart = firstTickerRange.getString(1);
-//									System.out.println("start Date: " + intervalStart);
-//									System.out.println("Interval: " + j);							
+									if (rs2.getString(1).equals("FTR")) {
+										System.out.println("start Date: " + intervalStart);
+										System.out.println("Interval: " + j);	
+									}
+						
 									IntervalStartDates.put(j, intervalStart);
 									// Get end date of interval	
 								} else if (dayNum == (j*60)) {
@@ -181,60 +182,94 @@ class SimurdakAssignment3 {
 								dayNum++;
 							}					
 						}
+						if (rs2.getString(1).equals("FTR")) {
+							System.out.println("IntervalStartDates = " + IntervalStartDates.entrySet());
+						}
+			
 //						System.out.println("first Ticker: " + firstTicker);
 						
+						// adjust prices for that ticker and save in an ArrayList of day prices
+						CompanyData cur_co_data = CalculatePrices(showTickerDays(rs2.getString(1), max_minDate, min_maxDate));
 						
-						// adjust prices for that ticker
-						showTickerDays(rs2.getString(1), max_minDate, min_maxDate);
-						CalculatePrices();
 						
-	
 						// For each Interval
 						for (int k = 1; k <= numIntervals; k++) {
-							
-							if (k < numIntervals) {
-								// Get dates of interval for this ticker and interval
-								DataRange.setString(1, rs2.getString(1));
-								DataRange.setString(2, IntervalStartDates.get(k));
-								DataRange.setString(3, IntervalEndDates.get(k));
-								ResultSet startDate = DataRange.executeQuery();
-								Prices startDayPrices = null;
-								Prices endDayPrices = null;	
+							if (rs2.getString(1).equals("FTR")) {
+								System.out.println("k = " + k);
+
+							}
+							String startDay = null;
+							String endDay = null;
+							if (i == 0) {
+								startDay = IntervalStartDates.get(k);
+								endDay = IntervalEndDates.get(k);
+							} else {
+//								System.out.println("not first ticker");
 								
-								while (startDate.next()) {
-									if (startDate.isFirst()) {
-										startDayPrices = new Prices(startDate.getString(1));
+								if (k < numIntervals) {
+									// Get dates of interval for this ticker and interval
+									if (rs2.getString(1).equals("FTR")) {
+										System.out.println("startDate: " + IntervalStartDates.get(k) + " Interval end date: " + IntervalEndDates.get(k));
+
 									}
-									if (startDate.isLast()) {
-										endDayPrices = new Prices(startDate.getString(1));
-									}
-								}
+									DataRange.setString(1, rs2.getString(1));
+									DataRange.setString(2, IntervalStartDates.get(k));
+									DataRange.setString(3, IntervalStartDates.get(k + 1));
+									ResultSet startDate = DataRange.executeQuery();
 									
-							} else { //last interval
-								// Get dates of interval for this ticker and interval
-								LastDataRange.setString(1, rs2.getString(1));
-								LastDataRange.setString(2, IntervalStartDates.get(k));
-								LastDataRange.setString(3, IntervalEndDates.get(k));
-								ResultSet startDate = DataRange.executeQuery();
-								Prices startDayPrices = null;
-								Prices endDayPrices = null;	
-								
-								while (startDate.next()) {
-									if (startDate.isFirst()) {
-										startDayPrices = new Prices(startDate.getString(1));
+									int count = 0;
+//									System.out.println("before while loop");
+									while (startDate.next()) {
+//										System.out.println("count = " + count);
+										if (count == 0) { //start date of interval
+											startDay = startDate.getString(1);
+										}
+										count++;
+										if (startDate.isLast()) { // end date of interval
+											endDay = startDate.getString(1);
+											if (rs2.getString(1).equals("FTR")) {
+												System.out.println("end day set: " + endDay);
+											}
+										}
 									}
-									if (startDate.isLast()) {
-										endDayPrices = new Prices(startDate.getString(1));
+										
+								} else { //last interval
+									if (rs2.getString(1).equals("FTR")) {
+										System.out.println("last interval");
+
+									}
+									// Get dates of interval for this ticker and interval
+									LastDataRange.setString(1, rs2.getString(1));
+									LastDataRange.setString(2, IntervalStartDates.get(k));
+									LastDataRange.setString(3, IntervalEndDates.get(k));
+									ResultSet startDate = DataRange.executeQuery();
+
+									
+									while (startDate.next()) {
+										if (startDate.isFirst()) {
+											startDay = startDate.getString(1);
+										}
+										if (startDate.isLast()) {
+											endDay = startDate.getString(1);
+										}
 									}
 								}
 							}
 							
-							
+						
+//							Double industryReturn = calcIndustryReturn(cur_co_data.getPrices(startDay), cur_co_data.getPrices(endDay));
+							if (rs2.getString(1).equals("FTR")) {
+
+								System.out.println("StartDay: " + startDay);
+								Double tickerReturn = calcTickerReturn(cur_co_data.getPrices(startDay), cur_co_data.getPrices(endDay));
+
+								System.out.println("StartDate: " + startDay + " endDate: " + endDay + " ticker return: " + tickerReturn);
+							}
 						}
 						i++;
 						
 					}	
-				}
+//				}
 
 			}
 			
@@ -252,21 +287,19 @@ class SimurdakAssignment3 {
 	
 
 	
-	/* When dates are specified */
-	static int showTickerDays(String ticker, String start_date, String end_date) throws SQLException {
+	/* returns a co_data object */
+	static CompanyData showTickerDays(String ticker, String start_date, String end_date) throws SQLException {
+		
+		
+		CompanyData co_data = new CompanyData(ticker);
 
-		// Prepare query
-		PreparedStatement name = conn
-				.prepareStatement("select name, Ticker" + "	from company " + "   where Ticker = ?");
-
+		
 		PreparedStatement PVdata1 = conn.prepareStatement("select *" + "	from PriceVolume "
 				+ "   where Ticker = ? and TransDate between ? and ? " + "   order by TransDate DESC");
 
 		// PV Data Columns: 1) Ticker 2) TransDate 3) OpenPrice 4)HighPrice 5) LowPrice
 		// 6) ClosePrice 7) Volume
 
-		name.setString(1, ticker);
-		ResultSet rs = name.executeQuery();
 
 		PVdata1.setString(1, ticker);
 		PVdata1.setString(1, ticker);
@@ -275,29 +308,22 @@ class SimurdakAssignment3 {
 
 		ResultSet rs2 = PVdata1.executeQuery();
 
-		if (rs.next()) {
-//			System.out.printf("%s%n", rs.getString(1));
-			co_data = new CompanyData(rs.getString(1));
-			dayPrices = new ArrayList<Prices>();
 			while (rs2.next()) {
+				
 				Prices curDay = new Prices(rs2.getString(2));
 				curDay.addDay(rs2.getDouble(3), rs2.getDouble(4), rs2.getDouble(5), rs2.getDouble(6));
-				dayPrices.add(curDay);
+				co_data.addDay(curDay, rs2.getString(2));
 				co_data.countDay();
 			}
 
-		} else {
-			System.out.printf("%s not found in database.\n%n", ticker);
-			return -1;
-
-		}
-		name.close();
 		PVdata1.close();
-		return 0;
+		return co_data;
 	}
 	
-	/* Calculate Price data */
-	static void CalculatePrices() {
+	/* Calculate Price data: returns co_data */
+	static CompanyData CalculatePrices(CompanyData co_data) {
+		ArrayList<Prices> dayPrices = co_data.getDayPrices();
+		
 		int daySize = dayPrices.size() - 1;
 		String split = null;
 		double totalDivisor = 1.0;
@@ -320,16 +346,26 @@ class SimurdakAssignment3 {
 
 				dayPrices.get(d - 1).updateClose(totalDivisor);
 				dayPrices.get(d - 1).updateOpen(totalDivisor);
-
+				
+				if (d == (daySize - 1)) {
+					dayPrices.get(d).updateClose(totalDivisor);
+					dayPrices.get(d).updateOpen(totalDivisor);
+				}
 			}
 		}
-////		co_data.getSplitDays();
-//		 for (int d = 0; d < daySize - 1; d++) {
-//		
-////		 System.out.println(dayPrices.get(d).getDate() + " open: " +
-////		 dayPrices.get(d).getOpen() + " close: " + dayPrices.get(d).getClose());
-//		
-//		 }
+
+//		System.out.println("ticker: " + co_data.getCompany());
+//		if (co_data.getCompany().equals("INTC")) {
+//			 for (int d = 0; d < daySize - 1; d++) {
+//					
+//				 System.out.println(dayPrices.get(d).getDate() + " open: " +
+//				 dayPrices.get(d).getOpen() + " close: " + dayPrices.get(d).getClose());
+//				
+//				 }
+//		}
+
+		
+		return co_data;
 	}
 
 	/* returns a string of the split or null if not */
@@ -345,5 +381,23 @@ class SimurdakAssignment3 {
 		}
 	}
 	
+	/* returns the TickerReturn for given prices */
+	public static Double calcTickerReturn(Prices startDay, Prices endDay) {
+		Double result = endDay.getClose() / startDay.getOpen();
+		return (result - 1);
+		
+	}
+	
+//	/* returns the TickerReturn for given prices */
+//	public static Double calcIndustryReturn(Prices startDay, Prices endDay) {
+//		
+//	}
+	
+	
+	
+	
+	
 }
-			
+	
+
+
