@@ -143,10 +143,9 @@ class SimurdakAssignment3 {
 				int i = 0;
 				LinkedHashMap<Integer, String> IntervalStartDates = new LinkedHashMap<>();
 				LinkedHashMap<Integer, String> IntervalEndDates = new LinkedHashMap<>();
-				
+				ArrayList<CompanyData> Tickers = new ArrayList<CompanyData>();
 				
 				// For each Ticker
-//				if (rs.getString(1).equals("Telecommunications Services")) {
 					while (rs2.next()) { 
 
 						if (i == 0) {
@@ -164,10 +163,10 @@ class SimurdakAssignment3 {
 								// Get start date of interval
 								if (dayNum == 1 + ((j - 1)*60)) {
 									String intervalStart = firstTickerRange.getString(1);
-									if (rs2.getString(1).equals("FTR")) {
-										System.out.println("start Date: " + intervalStart);
-										System.out.println("Interval: " + j);	
-									}
+//									if (rs2.getString(1).equals("FTR")) {
+//										System.out.println("start Date: " + intervalStart);
+//										System.out.println("Interval: " + j);	
+//									}
 						
 									IntervalStartDates.put(j, intervalStart);
 									// Get end date of interval	
@@ -182,36 +181,23 @@ class SimurdakAssignment3 {
 								dayNum++;
 							}					
 						}
-						if (rs2.getString(1).equals("FTR")) {
-							System.out.println("IntervalStartDates = " + IntervalStartDates.entrySet());
-						}
-			
-//						System.out.println("first Ticker: " + firstTicker);
-						
+					
 						// adjust prices for that ticker and save in an ArrayList of day prices
 						CompanyData cur_co_data = CalculatePrices(showTickerDays(rs2.getString(1), max_minDate, min_maxDate));
 						
 						
 						// For each Interval
 						for (int k = 1; k <= numIntervals; k++) {
-							if (rs2.getString(1).equals("FTR")) {
-								System.out.println("k = " + k);
 
-							}
-							String startDay = null;
-							String endDay = null;
 							if (i == 0) {
-								startDay = IntervalStartDates.get(k);
-								endDay = IntervalEndDates.get(k);
+								cur_co_data.addStartDate(k, IntervalStartDates.get(k));
+								cur_co_data.addEndDate(k, IntervalEndDates.get(k));
+
 							} else {
 //								System.out.println("not first ticker");
 								
 								if (k < numIntervals) {
 									// Get dates of interval for this ticker and interval
-									if (rs2.getString(1).equals("FTR")) {
-										System.out.println("startDate: " + IntervalStartDates.get(k) + " Interval end date: " + IntervalEndDates.get(k));
-
-									}
 									DataRange.setString(1, rs2.getString(1));
 									DataRange.setString(2, IntervalStartDates.get(k));
 									DataRange.setString(3, IntervalStartDates.get(k + 1));
@@ -222,22 +208,16 @@ class SimurdakAssignment3 {
 									while (startDate.next()) {
 //										System.out.println("count = " + count);
 										if (count == 0) { //start date of interval
-											startDay = startDate.getString(1);
+											cur_co_data.addStartDate(k, startDate.getString(1));
 										}
 										count++;
 										if (startDate.isLast()) { // end date of interval
-											endDay = startDate.getString(1);
-											if (rs2.getString(1).equals("FTR")) {
-												System.out.println("end day set: " + endDay);
-											}
+											cur_co_data.addEndDate(k, startDate.getString(1));
+//											
 										}
 									}
 										
 								} else { //last interval
-									if (rs2.getString(1).equals("FTR")) {
-										System.out.println("last interval");
-
-									}
 									// Get dates of interval for this ticker and interval
 									LastDataRange.setString(1, rs2.getString(1));
 									LastDataRange.setString(2, IntervalStartDates.get(k));
@@ -247,30 +227,24 @@ class SimurdakAssignment3 {
 									
 									while (startDate.next()) {
 										if (startDate.isFirst()) {
-											startDay = startDate.getString(1);
+//											startDay = startDate.getString(1);
+											cur_co_data.addStartDate(k, startDate.getString(1));
+
 										}
 										if (startDate.isLast()) {
-											endDay = startDate.getString(1);
+//											endDay = startDate.getString(1);
+											cur_co_data.addEndDate(k, startDate.getString(1));
 										}
 									}
 								}
 							}
-							
-						
-//							Double industryReturn = calcIndustryReturn(cur_co_data.getPrices(startDay), cur_co_data.getPrices(endDay));
-							if (rs2.getString(1).equals("FTR")) {
-
-								System.out.println("StartDay: " + startDay);
-								Double tickerReturn = calcTickerReturn(cur_co_data.getPrices(startDay), cur_co_data.getPrices(endDay));
-
-								System.out.println("StartDate: " + startDay + " endDate: " + endDay + " ticker return: " + tickerReturn);
-							}
 						}
+						Tickers.add(cur_co_data);
 						i++;
 						
-					}	
-//				}
-
+					}
+					int m = Tickers.size();
+					CalculateIndustryData(m, numIntervals, Tickers);
 			}
 			
 			System.out.println("done with while loop");
@@ -285,7 +259,6 @@ class SimurdakAssignment3 {
 		}	
 	}
 	
-
 	
 	/* returns a co_data object */
 	static CompanyData showTickerDays(String ticker, String start_date, String end_date) throws SQLException {
@@ -354,16 +327,6 @@ class SimurdakAssignment3 {
 			}
 		}
 
-//		System.out.println("ticker: " + co_data.getCompany());
-//		if (co_data.getCompany().equals("INTC")) {
-//			 for (int d = 0; d < daySize - 1; d++) {
-//					
-//				 System.out.println(dayPrices.get(d).getDate() + " open: " +
-//				 dayPrices.get(d).getOpen() + " close: " + dayPrices.get(d).getClose());
-//				
-//				 }
-//		}
-
 		
 		return co_data;
 	}
@@ -388,10 +351,47 @@ class SimurdakAssignment3 {
 		
 	}
 	
-//	/* returns the TickerReturn for given prices */
-//	public static Double calcIndustryReturn(Prices startDay, Prices endDay) {
-//		
-//	}
+	public static void CalculateIndustryData(int m, int intervals, ArrayList<CompanyData> Tickers) {
+		// for each ticker
+		for (int x = 0; x < m; x++) {
+			ArrayList<Integer> TickersIndex = new ArrayList<Integer>(); //list of indexes into Tickers for all companies except X
+			for (int i = 0; i < Tickers.size(); i++) {
+				if (!Tickers.get(i).getCompany().equals(Tickers.get(x).getCompany())) {
+					TickersIndex.add(i); 
+				}
+			}
+			// for each interval
+			for (int y = 1; y <= intervals; y++) {
+				String start = Tickers.get(x).getIntervalStartDate(y);
+				String end = Tickers.get(x).getIntervalEndDate(y);
+				
+				Double tickerReturn = calcTickerReturn(Tickers.get(x).getPrices(start), Tickers.get(x).getPrices(end));
+//				if (Tickers.get(x).getCompany().equals("CTL")) {
+//					System.out.println("start: " + start + " end: " + end);
+//					Double tickerReturn = calcTickerReturn(Tickers.get(x).getPrices(start), Tickers.get(x).getPrices(end));
+//					System.out.println("tickerReturn: " + tickerReturn);
+//				}
+				
+				
+				//Calculate Industry Return
+				Double sum = 0.0;
+				for (int k = 0; k < m - 1; k++) {
+					
+					String closeDay = Tickers.get(TickersIndex.get(k)).getIntervalEndDate(y);
+					Prices closeP =  Tickers.get(TickersIndex.get(k)).getPrices(closeDay);
+					
+					String startDay = Tickers.get(TickersIndex.get(k)).getIntervalStartDate(y);
+					Prices openP =  Tickers.get(TickersIndex.get(k)).getPrices(startDay);
+					
+					sum += (closeP.getClose() / openP.getOpen());
+					
+				}
+				Double industryReturn = ((1/(m-1)) * sum) - 1;
+				
+			}
+			
+		}
+	}
 	
 	
 	
