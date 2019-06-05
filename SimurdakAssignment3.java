@@ -366,11 +366,7 @@ class SimurdakAssignment3 {
 				String end = Tickers.get(x).getIntervalEndDate(y);
 				
 				Double tickerReturn = calcTickerReturn(Tickers.get(x).getPrices(start), Tickers.get(x).getPrices(end));
-//				if (Tickers.get(x).getCompany().equals("CTL")) {
-//					System.out.println("start: " + start + " end: " + end);
-//					Double tickerReturn = calcTickerReturn(Tickers.get(x).getPrices(start), Tickers.get(x).getPrices(end));
-//					System.out.println("tickerReturn: " + tickerReturn);
-//				}
+				
 				
 				
 				//Calculate Industry Return
@@ -384,9 +380,19 @@ class SimurdakAssignment3 {
 					Prices openP =  Tickers.get(TickersIndex.get(k)).getPrices(startDay);
 					
 					sum += (closeP.getClose() / openP.getOpen());
+					if (Tickers.get(x).getCompany().equals("CTL")) {
+						System.out.println("Ticker: " + Tickers.get(TickersIndex.get(k)).getCompany());
+						System.out.println("sum: " + sum);
+					}
 					
 				}
-				Double industryReturn = ((1/(m-1)) * sum) - 1;
+				Double industryReturn = ((1.0/(m-1)) * sum) - 1.0;
+
+				if (Tickers.get(x).getCompany().equals("CTL")) {
+					System.out.println("start: " + start + " end: " + end);
+					System.out.println("tickerReturn: " + tickerReturn);
+					System.out.println("IndustryReturn: " + industryReturn);
+				}
 				
 			}
 			
