@@ -6,12 +6,18 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
-import java.util.Map.Entry;
 
 class SimurdakAssignment3 {
 
 	static Connection conn = null;
 	static Connection write = null;
+	
+	static final String dropPerformanceTable = "drop table if exists Performance; ";
+	static final String createPerformanceTable = "create table Performance (Industry char(30), Ticker char(6), StartDate char(10), EndDate char(10), TickerReturn char(12), IndustryReturn char(12));";   
+	static final String insertPerformance = " insert into Performance(Industry, Ticker, StartDate, EndDate, TickerReturn, IndustryReturn) values(?, ?, ?, ?, ?, ?);";
+	
+	String writeFile = "writerparams.txt";
+	Properties writeprops = new Properties();
 
 
 
@@ -34,20 +40,34 @@ class SimurdakAssignment3 {
 			String dburl = connectprops.getProperty("dburl");
 			String username = connectprops.getProperty("user");
 			conn = DriverManager.getConnection(dburl, connectprops);
-			System.out.printf("Database connection %s %s established.%n", dburl, username);
+			System.out.printf("Reader connection established: Database connection %s %s established.%n", dburl, username);
 
 			String dburl2 = writeprops.getProperty("dburl");
 			String username2 = writeprops.getProperty("user");
 			write = DriverManager.getConnection(dburl2, writeprops);
-			System.out.printf("Database connection %s %s established.%n", dburl2, username2);
+			System.out.printf("Writer connection established: Database connection %s %s established.%n", dburl2, username2);
 			
 			
-			// Prepared statments
+			// Prepared statements
+
+			Statement stmt = write.createStatement();
+			stmt.execute(dropPerformanceTable);
+			stmt.execute(createPerformanceTable );
+			
+			PreparedStatement insert = write
+					.prepareStatement("insert into Performance(Industry, Ticker, StartDate, EndDate, TickerReturn, IndustryReturn) values(?, ?, ?, ?, ?, ?)");
+			
 			PreparedStatement industry = conn
-					.prepareStatement("select Industry, count(distinct Ticker) as TickerCnt" + 
+					.prepareStatement("select Industry, count(distinct Ticker) as TickerCnt " + 
 							" from Company natural join PriceVolume" + 
 							" group by Industry" + 
 							" order by TickerCnt DESC, Industry");
+			
+			PreparedStatement industryN = conn
+					.prepareStatement("select Industry " + 
+							" from Company natural join PriceVolume" + 
+							" group by Industry" + 
+							" order by Industry");
 			
 			PreparedStatement industryTickers = conn
 					.prepareStatement("select Ticker, min(TransDate), max(TransDate), count(distinct TransDate) as TradingDays" + 
@@ -95,13 +115,28 @@ class SimurdakAssignment3 {
 					.prepareStatement(" select P.TransDate" + 
 							" from PriceVolume P" + 
 							" where Ticker = ? and TransDate >= ? and TransDate <= ? ");
-			
-			
+
 			ResultSet rs = industry.executeQuery();
+			ResultSet print = industryN.executeQuery();
+			
+			int countIndustry = 0;
+			ArrayList<String> toPrint = new ArrayList<String>();
+			while (print.next()) {
+				countIndustry++;
+				toPrint.add(print.getString(1));
+			}
+			System.out.println(countIndustry + " industries found");
+			for (int n = 0; n < countIndustry; n++) {
+				System.out.println(toPrint.get(n));
+			}
+			System.out.println("");
 			
 			// For each Industry
-			while (rs.next()) { 
-								
+			while (rs.next()) {
+				
+				String industryName = rs.getString(1);
+				System.out.println("Processing " + industryName);
+				
 				//Find max(min(TransDate)
 				max_min_TransDate.setString(1, rs.getString(1));
 				ResultSet result = max_min_TransDate.executeQuery();
@@ -117,13 +152,12 @@ class SimurdakAssignment3 {
 				if (result2.next()) {
 					min_maxDate = result2.getString(1);
 				}
-				
+				System.out.println(rs.getInt(2) + " accepted tickers for " + industryName + "(" + max_minDate + " - " + min_maxDate + "), \n");
+
 				industryTickers.setString(1, rs.getString(1));
 				industryTickers.setString(2, max_minDate);
 				industryTickers.setString(3, min_maxDate);
 				ResultSet rs2 = industryTickers.executeQuery();
-				System.out.println("Industry: " + rs.getString(1) + " " + rs.getDouble(2));
-				System.out.println("start date: " + max_minDate + " end date: " + min_maxDate);
 				
 				// Get trading intervals
 				min_tradingDays.setString(1, rs.getString(1));
@@ -133,10 +167,8 @@ class SimurdakAssignment3 {
 				int numIntervals = 0;
 				if (numDays.next()) {
 					numIntervals = numDays.getInt(1);
-//					System.out.println("numDays: " + numIntervals);
 				}
 				numIntervals = numIntervals/60;
-				System.out.println("numIntervals = " + numIntervals);
 				
 				// First Ticker
 				String firstTicker = null;
@@ -147,7 +179,7 @@ class SimurdakAssignment3 {
 				
 				// For each Ticker
 					while (rs2.next()) { 
-
+						
 						if (i == 0) {
 							firstTicker = rs2.getString(1);
 							// Store all start and end dates of the intervals for the first ticker
@@ -163,18 +195,10 @@ class SimurdakAssignment3 {
 								// Get start date of interval
 								if (dayNum == 1 + ((j - 1)*60)) {
 									String intervalStart = firstTickerRange.getString(1);
-//									if (rs2.getString(1).equals("FTR")) {
-//										System.out.println("start Date: " + intervalStart);
-//										System.out.println("Interval: " + j);	
-//									}
-						
 									IntervalStartDates.put(j, intervalStart);
 									// Get end date of interval	
 								} else if (dayNum == (j*60)) {
-//									System.out.println("DayNum: " + dayNum);
-									String intervalEnd = firstTickerRange.getString(1);
-//									System.out.println("end Date: " + intervalEnd);
-							
+									String intervalEnd = firstTickerRange.getString(1);							
 									IntervalEndDates.put(j, intervalEnd);
 									j++; //another interval accounted for
 								}
@@ -193,9 +217,7 @@ class SimurdakAssignment3 {
 								cur_co_data.addStartDate(k, IntervalStartDates.get(k));
 								cur_co_data.addEndDate(k, IntervalEndDates.get(k));
 
-							} else {
-//								System.out.println("not first ticker");
-								
+							} else {								
 								if (k < numIntervals) {
 									// Get dates of interval for this ticker and interval
 									DataRange.setString(1, rs2.getString(1));
@@ -204,16 +226,13 @@ class SimurdakAssignment3 {
 									ResultSet startDate = DataRange.executeQuery();
 									
 									int count = 0;
-//									System.out.println("before while loop");
 									while (startDate.next()) {
-//										System.out.println("count = " + count);
 										if (count == 0) { //start date of interval
 											cur_co_data.addStartDate(k, startDate.getString(1));
 										}
 										count++;
 										if (startDate.isLast()) { // end date of interval
-											cur_co_data.addEndDate(k, startDate.getString(1));
-//											
+											cur_co_data.addEndDate(k, startDate.getString(1));											
 										}
 									}
 										
@@ -227,12 +246,10 @@ class SimurdakAssignment3 {
 									
 									while (startDate.next()) {
 										if (startDate.isFirst()) {
-//											startDay = startDate.getString(1);
 											cur_co_data.addStartDate(k, startDate.getString(1));
 
 										}
 										if (startDate.isLast()) {
-//											endDay = startDate.getString(1);
 											cur_co_data.addEndDate(k, startDate.getString(1));
 										}
 									}
@@ -244,15 +261,72 @@ class SimurdakAssignment3 {
 						
 					}
 					int m = Tickers.size();
-					CalculateIndustryData(m, numIntervals, Tickers);
+					
+					// Calculate Industry and Ticker Returns //
+					
+					// for each ticker
+					for (int x = 0; x < m; x++) {
+						ArrayList<Integer> TickersIndex = new ArrayList<Integer>(); //list of indexes into Tickers for all companies except X
+						for (int ix = 0; ix < Tickers.size(); ix++) {
+							if (!Tickers.get(ix).getCompany().equals(Tickers.get(x).getCompany())) {
+								TickersIndex.add(ix); 
+							}
+						}
+						// for each interval
+						for (int y = 1; y <= numIntervals; y++) {
+							String start = Tickers.get(x).getIntervalStartDate(y);
+							String end = Tickers.get(x).getIntervalEndDate(y);
+							
+							Double tickerReturn = calcTickerReturn(Tickers.get(x).getPrices(start), Tickers.get(x).getPrices(end));
+							
+							
+							
+							//Calculate Industry Return
+							Double sum = 0.0;
+							for (int k = 0; k < m - 1; k++) {
+								
+								String closeDay = Tickers.get(TickersIndex.get(k)).getIntervalEndDate(y);
+								Prices closeP =  Tickers.get(TickersIndex.get(k)).getPrices(closeDay);
+								
+								String startDay = Tickers.get(TickersIndex.get(k)).getIntervalStartDate(y);
+								Prices openP =  Tickers.get(TickersIndex.get(k)).getPrices(startDay);
+								
+								sum += (closeP.getClose() / openP.getOpen());
+								
+							}
+							Double industryReturn = ((1.0/(m-1)) * sum) - 1.0;
+							
+							// Write output to simurdh database
+							String tickerRet = String.format("%10.7f",  tickerReturn);
+							String industryRet = String.format("%10.7f",  industryReturn);
+							
+							insert.setString(1, industryName); // Industry
+							insert.setString(2, Tickers.get(x).getCompany()); // Ticker ??????
+							insert.setString(3, start); // StartDate
+							insert.setString(4, end); // EndDate
+							insert.setString(5, tickerRet); // TickerReturn
+							insert.setString(6, industryRet); // IndustryReturn
+							
+							insert.executeUpdate();
+						}
+					}
 			}
 			
-			System.out.println("done with while loop");
-			
+			insert.close();
+			industryN.close();
 			industry.close();
 			industryTickers.close();
+			max_min_TransDate.close();
+			min_max_TransDate.close();
+			min_tradingDays.close();
+			DataRange.close();
+			LastDataRange.close();		
 			
 			conn.close();
+			write.close();
+			
+			System.out.println("Database connections closed");
+			
 		} catch (SQLException ex) {
 			System.out.printf("SQLException: %s%nSQLState: %s%nVendorError: %s%n", ex.getMessage(), ex.getSQLState(),
 					ex.getErrorCode());
@@ -263,9 +337,7 @@ class SimurdakAssignment3 {
 	/* returns a co_data object */
 	static CompanyData showTickerDays(String ticker, String start_date, String end_date) throws SQLException {
 		
-		
 		CompanyData co_data = new CompanyData(ticker);
-
 		
 		PreparedStatement PVdata1 = conn.prepareStatement("select *" + "	from PriceVolume "
 				+ "   where Ticker = ? and TransDate between ? and ? " + "   order by TransDate DESC");
@@ -326,8 +398,6 @@ class SimurdakAssignment3 {
 				}
 			}
 		}
-
-		
 		return co_data;
 	}
 
@@ -350,59 +420,6 @@ class SimurdakAssignment3 {
 		return (result - 1);
 		
 	}
-	
-	public static void CalculateIndustryData(int m, int intervals, ArrayList<CompanyData> Tickers) {
-		// for each ticker
-		for (int x = 0; x < m; x++) {
-			ArrayList<Integer> TickersIndex = new ArrayList<Integer>(); //list of indexes into Tickers for all companies except X
-			for (int i = 0; i < Tickers.size(); i++) {
-				if (!Tickers.get(i).getCompany().equals(Tickers.get(x).getCompany())) {
-					TickersIndex.add(i); 
-				}
-			}
-			// for each interval
-			for (int y = 1; y <= intervals; y++) {
-				String start = Tickers.get(x).getIntervalStartDate(y);
-				String end = Tickers.get(x).getIntervalEndDate(y);
-				
-				Double tickerReturn = calcTickerReturn(Tickers.get(x).getPrices(start), Tickers.get(x).getPrices(end));
-				
-				
-				
-				//Calculate Industry Return
-				Double sum = 0.0;
-				for (int k = 0; k < m - 1; k++) {
-					
-					String closeDay = Tickers.get(TickersIndex.get(k)).getIntervalEndDate(y);
-					Prices closeP =  Tickers.get(TickersIndex.get(k)).getPrices(closeDay);
-					
-					String startDay = Tickers.get(TickersIndex.get(k)).getIntervalStartDate(y);
-					Prices openP =  Tickers.get(TickersIndex.get(k)).getPrices(startDay);
-					
-					sum += (closeP.getClose() / openP.getOpen());
-					if (Tickers.get(x).getCompany().equals("CTL")) {
-						System.out.println("Ticker: " + Tickers.get(TickersIndex.get(k)).getCompany());
-						System.out.println("sum: " + sum);
-					}
-					
-				}
-				Double industryReturn = ((1.0/(m-1)) * sum) - 1.0;
-
-				if (Tickers.get(x).getCompany().equals("CTL")) {
-					System.out.println("start: " + start + " end: " + end);
-					System.out.println("tickerReturn: " + tickerReturn);
-					System.out.println("IndustryReturn: " + industryReturn);
-				}
-				
-			}
-			
-		}
-	}
-	
-	
-	
-	
-	
 }
 	
 
